@@ -109,7 +109,7 @@ export class Contract {
         "div",
         pool.amount0,
       ]);
-      if (amount1Adjust <= amount1) {
+      if (bn(amount1Adjust).lte(amount1)) {
         amount0Adjust = amount0;
       } else {
         amount0Adjust = bnCal([
