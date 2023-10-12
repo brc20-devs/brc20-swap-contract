@@ -79,6 +79,7 @@ export class Contract {
       this.assets.mintLp(address, pair, firstLP, amount0, amount1);
       this.assets.mintLp("0", pair, "1000");
 
+      checkGtZero(firstLP);
       need(
         bn(firstLP).gte(
           bnCal([
@@ -98,24 +99,36 @@ export class Contract {
 
       return { lp: firstLP, amount0, amount1 };
     } else {
-      const lp0 = bnCal([amount0, "mul", pool.lp, "div", pool.amount0]);
-      const lp1 = bnCal([amount1, "mul", pool.lp, "div", pool.amount1]);
-
-      let lp: string;
       let amount0Adjust: string;
       let amount1Adjust: string;
-      if (bn(lp0).lt(lp1)) {
+
+      amount1Adjust = bnCal([
+        amount0,
+        "mul",
+        pool.amount1,
+        "div",
+        pool.amount0,
+      ]);
+      if (amount1Adjust <= amount1) {
         amount0Adjust = amount0;
-        amount1Adjust = bnCal([lp0, "mul", pool.amount1, "div", pool.lp]);
-        lp = lp0;
       } else {
-        amount0Adjust = bnCal([lp1, "mul", pool.amount0, "div", pool.lp]);
+        amount0Adjust = bnCal([
+          amount1,
+          "mul",
+          pool.amount0,
+          "div",
+          pool.amount1,
+        ]);
         amount1Adjust = amount1;
-        lp = lp1;
       }
+
+      const lp0 = bnCal([amount0Adjust, "mul", pool.lp, "div", pool.amount0]);
+      const lp1 = bnCal([amount1Adjust, "mul", pool.lp, "div", pool.amount1]);
+      const lp = bn(lp0).lt(lp1) ? lp0 : lp1;
 
       this.assets.mintLp(address, pair, lp, amount0Adjust, amount1Adjust);
 
+      checkGtZero(lp);
       need(
         bn(lp).gte(
           bnCal([
