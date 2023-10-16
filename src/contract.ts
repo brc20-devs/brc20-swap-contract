@@ -60,6 +60,8 @@ export class Contract {
     const { tick0, tick1, amount0, amount1, expect, slippage1000 } =
       sortTickParams(params);
 
+    checkGtZero(amount0);
+    checkGtZero(amount1);
     checkGteZero(expect);
     checkSlippage(slippage1000);
 
@@ -167,6 +169,7 @@ export class Contract {
     const { address, lp, tick0, tick1, amount0, amount1, slippage1000 } =
       sortTickParams(params);
 
+    checkGtZero(lp);
     checkGteZero(amount0);
     checkGteZero(amount1);
     checkSlippage(slippage1000);
@@ -237,6 +240,7 @@ export class Contract {
       amount,
     } = sortTickParams(params);
 
+    checkGtZero(amount);
     checkGteZero(expect);
     checkSlippage(slippage1000);
 
@@ -359,6 +363,7 @@ export class Contract {
 
   public send(params: SendIn): SendOut {
     const { from, to, tick, amount } = params;
+    checkGtZero(amount);
     this.assets.get(tick).transfer(from, to, amount);
     return {};
   }
