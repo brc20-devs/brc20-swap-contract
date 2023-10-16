@@ -2,18 +2,18 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import { Contract } from "../src/contract";
 import { Assets } from "../src/assets";
-import { bnCal } from "../src/bn";
+import { uintCal } from "../src/bn";
 
 describe("Contract Test", () => {
   it("addLiq", async () => {
     const assets = new Assets({
       swap: {
         ordi: {
-          balance: { "1": bnCal(["10000", "mul", "1e18"]) },
+          balance: { "1": uintCal(["10000", "mul", "1e18"]) },
           tick: "ordi",
         },
         sats: {
-          balance: { "1": bnCal(["50000", "mul", "1e18"]) },
+          balance: { "1": uintCal(["50000", "mul", "1e18"]) },
           tick: "sats",
         },
       },
@@ -34,8 +34,8 @@ describe("Contract Test", () => {
       address: "1",
       tick0: "ordi",
       tick1: "sats",
-      amount0: bnCal(["10000", "mul", "1e18"]),
-      amount1: bnCal(["50000", "mul", "1e18"]),
+      amount0: uintCal(["10000", "mul", "1e18"]),
+      amount1: uintCal(["50000", "mul", "1e18"]),
       expect: "0",
       slippage1000: "0",
     });

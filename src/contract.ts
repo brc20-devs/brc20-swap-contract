@@ -15,7 +15,7 @@ import {
   SwapIn,
   SwapOut,
 } from "./types";
-import { bn, bnCal } from "./bn";
+import { bn, uintCal } from "./bn";
 import {
   checkGtZero,
   checkGteZero,
@@ -75,10 +75,10 @@ export class Contract {
     });
 
     if (this.assets.get(pair).supply == "0") {
-      const lp = bnCal([amount0, "mul", amount1, "sqrt"]);
+      const lp = uintCal([amount0, "mul", amount1, "sqrt"]);
 
       // ensure there is always liquidity in the pool
-      const firstLP = bnCal([lp, "sub", "1000"]);
+      const firstLP = uintCal([lp, "sub", "1000"]);
 
       this.assets.get(pair).mint(address, firstLP);
       this.assets.get(pair).mint("0", "1000");
@@ -88,10 +88,10 @@ export class Contract {
       checkGtZero(firstLP);
       need(
         bn(firstLP).gte(
-          bnCal([
+          uintCal([
             expect,
             "mul",
-            bnCal(["1000", "sub", slippage1000]),
+            uintCal(["1000", "sub", slippage1000]),
             "div",
             "1000",
           ])
@@ -100,7 +100,7 @@ export class Contract {
       );
 
       if (this.config.platformFeeOn) {
-        this.status.kLast[pair] = bnCal([
+        this.status.kLast[pair] = uintCal([
           this.assets.get(tick0).balanceOf(pair),
           "mul",
           this.assets.get(tick1).balanceOf(pair),
@@ -116,11 +116,17 @@ export class Contract {
       const poolAmount0 = this.assets.get(tick0).balanceOf(pair);
       const poolAmount1 = this.assets.get(tick1).balanceOf(pair);
 
-      amount1Adjust = bnCal([amount0, "mul", poolAmount1, "div", poolAmount0]);
+      amount1Adjust = uintCal([
+        amount0,
+        "mul",
+        poolAmount1,
+        "div",
+        poolAmount0,
+      ]);
       if (bn(amount1Adjust).lte(amount1)) {
         amount0Adjust = amount0;
       } else {
-        amount0Adjust = bnCal([
+        amount0Adjust = uintCal([
           amount1,
           "mul",
           poolAmount0,
@@ -130,8 +136,8 @@ export class Contract {
         amount1Adjust = amount1;
       }
 
-      const lp0 = bnCal([amount0Adjust, "mul", poolLp, "div", poolAmount0]);
-      const lp1 = bnCal([amount1Adjust, "mul", poolLp, "div", poolAmount1]);
+      const lp0 = uintCal([amount0Adjust, "mul", poolLp, "div", poolAmount0]);
+      const lp1 = uintCal([amount1Adjust, "mul", poolLp, "div", poolAmount1]);
       const lp = bn(lp0).lt(lp1) ? lp0 : lp1;
 
       this.assets.get(pair).mint(address, lp);
@@ -141,10 +147,10 @@ export class Contract {
       checkGtZero(lp);
       need(
         bn(lp).gte(
-          bnCal([
+          uintCal([
             expect,
             "mul",
-            bnCal(["1000", "sub", slippage1000]),
+            uintCal(["1000", "sub", slippage1000]),
             "div",
             "1000",
           ])
@@ -154,7 +160,7 @@ export class Contract {
       need(amount1Adjust == amount1 || amount0Adjust == amount0);
 
       if (this.config.platformFeeOn) {
-        this.status.kLast[pair] = bnCal([
+        this.status.kLast[pair] = uintCal([
           this.assets.get(tick0).balanceOf(pair),
           "mul",
           this.assets.get(tick1).balanceOf(pair),
@@ -185,8 +191,8 @@ export class Contract {
     const poolLp = this.assets.get(pair).supply;
     const reserve0 = this.assets.get(tick0).balanceOf(pair);
     const reserve1 = this.assets.get(tick1).balanceOf(pair);
-    const acquire0 = bnCal([lp, "mul", reserve0, "div", poolLp]);
-    const acquire1 = bnCal([lp, "mul", reserve1, "div", poolLp]);
+    const acquire0 = uintCal([lp, "mul", reserve0, "div", poolLp]);
+    const acquire1 = uintCal([lp, "mul", reserve1, "div", poolLp]);
 
     this.assets.get(pair).burn(address, lp);
     this.assets.get(tick0).transfer(pair, address, acquire0);
@@ -194,10 +200,10 @@ export class Contract {
 
     need(
       bn(acquire0).gte(
-        bnCal([
+        uintCal([
           amount0,
           "mul",
-          bnCal(["1000", "sub", slippage1000]),
+          uintCal(["1000", "sub", slippage1000]),
           "div",
           "1000",
         ])
@@ -206,10 +212,10 @@ export class Contract {
     );
     need(
       bn(acquire1).gte(
-        bnCal([
+        uintCal([
           amount1,
           "mul",
-          bnCal(["1000", "sub", slippage1000]),
+          uintCal(["1000", "sub", slippage1000]),
           "div",
           "1000",
         ])
@@ -218,7 +224,7 @@ export class Contract {
     );
 
     if (this.config.platformFeeOn) {
-      this.status.kLast[pair] = bnCal([
+      this.status.kLast[pair] = uintCal([
         this.assets.get(tick0).balanceOf(pair),
         "mul",
         this.assets.get(tick1).balanceOf(pair),
@@ -274,10 +280,10 @@ export class Contract {
         reserveOut,
       });
 
-      const amountOutMin = bnCal([
+      const amountOutMin = uintCal([
         expect,
         "mul",
-        bnCal(["1000", "div", bnCal(["1000", "add", slippage1000])]),
+        uintCal(["1000", "div", uintCal(["1000", "add", slippage1000])]),
       ]);
       need(bn(amountOut).gte(amountOutMin), exceeding_slippage);
 
@@ -302,10 +308,10 @@ export class Contract {
         reserveOut,
       });
 
-      const amountInMax = bnCal([
+      const amountInMax = uintCal([
         expect,
         "mul",
-        bnCal(["1000", "add", slippage1000]),
+        uintCal(["1000", "add", slippage1000]),
         "div",
         "1000",
       ]);
@@ -326,20 +332,20 @@ export class Contract {
       bn(reserveIn).gt("0") && bn(reserveOut).gt("0"),
       insufficient_liquidity
     );
-    const amountInWithFee = bnCal([
+    const amountInWithFee = uintCal([
       amountIn,
       "mul",
-      bnCal(["1000", "sub", this.config.swapFeeRate1000]),
+      uintCal(["1000", "sub", this.config.swapFeeRate1000]),
     ]);
-    const numerator = bnCal([amountInWithFee, "mul", reserveOut]);
-    const denominator = bnCal([
+    const numerator = uintCal([amountInWithFee, "mul", reserveOut]);
+    const denominator = uintCal([
       reserveIn,
       "mul",
       "1000",
       "add",
       amountInWithFee,
     ]);
-    return bnCal([numerator, "div", denominator]);
+    return uintCal([numerator, "div", denominator]);
   }
 
   getAmountIn(params: AmountOutputIn) {
@@ -350,15 +356,15 @@ export class Contract {
       insufficient_liquidity
     );
 
-    const numerator = bnCal([reserveIn, "mul", amountOut, "mul", "1000"]);
-    const denominator = bnCal([
+    const numerator = uintCal([reserveIn, "mul", amountOut, "mul", "1000"]);
+    const denominator = uintCal([
       reserveOut,
       "sub",
       amountOut,
       "mul",
-      bnCal(["1000", "sub", this.config.swapFeeRate1000]),
+      uintCal(["1000", "sub", this.config.swapFeeRate1000]),
     ]);
-    return bnCal([numerator, "div", denominator, "add", "1"]);
+    return uintCal([numerator, "div", denominator, "add", "1"]);
   }
 
   public send(params: SendIn): SendOut {
@@ -378,17 +384,17 @@ export class Contract {
 
     if (this.config.platformFeeOn) {
       if (bn(this.status.kLast[pair]).gt("0")) {
-        const rootK = bnCal([reserve0, "mul", reserve1, "sqrt"]);
-        const rootKLast = bnCal([this.status.kLast[pair], "sqrt"]);
+        const rootK = uintCal([reserve0, "mul", reserve1, "sqrt"]);
+        const rootKLast = uintCal([this.status.kLast[pair], "sqrt"]);
         if (bn(rootK).gt(rootKLast)) {
-          const numerator = bnCal([
+          const numerator = uintCal([
             this.assets.get(pair).supply,
             "mul",
-            bnCal([rootK, "sub", rootKLast]),
+            uintCal([rootK, "sub", rootKLast]),
           ]);
-          const scale = bnCal([this.config.platformFeeRate, "sub", "1"]);
-          const denominator = bnCal([rootK, "mul", scale, "add", rootKLast]);
-          const liquidity = bnCal([numerator, "div", denominator]);
+          const scale = uintCal([this.config.platformFeeRate, "sub", "1"]);
+          const denominator = uintCal([rootK, "mul", scale, "add", rootKLast]);
+          const liquidity = uintCal([numerator, "div", denominator]);
 
           this.assets.get(pair).mint(this.config.sequencer, liquidity);
         }

@@ -1,5 +1,5 @@
 import { Balance, Pool } from "./types";
-import { bn, bnCal } from "./bn";
+import { bn, uintCal } from "./bn";
 import { getPairStr, getPairStruct, need } from "./contract-utils";
 
 import { Brc20 } from "./brc20";

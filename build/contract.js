@@ -55,11 +55,11 @@
       DECIMAL_PLACES: 0,
       ROUNDING_MODE: bn.ROUND_DOWN,
   });
-  function bnCal(items, decimalPlaces) {
+  function _bnCal(items, decimalPlaces) {
       const _bn = bn.clone();
       _bn.config({
           EXPONENTIAL_AT: 1e9,
-          DECIMAL_PLACES: decimalPlaces ? parseInt(decimalPlaces) : 0,
+          DECIMAL_PLACES: parseInt(decimalPlaces),
           ROUNDING_MODE: bn.ROUND_DOWN,
       });
       let ret = _bn(items[0]);
@@ -74,7 +74,7 @@
               i++;
           }
           else if (cur == "sub") {
-              need(_bn(next).gte("0"));
+              need(_bn(ret).gte(next));
               ret = ret.minus(next);
               i++;
           }
@@ -84,7 +84,7 @@
               i++;
           }
           else if (cur == "div") {
-              need(_bn(next).gte("0"));
+              need(_bn(next).gt("0"));
               ret = ret.div(next);
               i++;
           }
@@ -107,6 +107,9 @@
           return ret.toString();
       }
   }
+  function uintCal(items) {
+      return _bnCal(items, "0");
+  }
 
   class Brc20 {
       constructor(balance, tick) {
@@ -115,7 +118,7 @@
           this.tick = tick;
           this._supply = "0";
           for (const address in this.balance) {
-              this._supply = bnCal([this._supply, "add", this.balance[address]]);
+              this._supply = uintCal([this._supply, "add", this.balance[address]]);
           }
       }
       get supply() {
@@ -126,29 +129,29 @@
       }
       transfer(from, to, amount) {
           this.checkAmount(amount);
-          this.balance[from] = bnCal([this.balance[from], "sub", amount]);
-          this.balance[to] = bnCal([this.balance[to] || "0", "add", amount]);
+          this.balance[from] = uintCal([this.balance[from], "sub", amount]);
+          this.balance[to] = uintCal([this.balance[to] || "0", "add", amount]);
           this.checkAddress(from);
           this.checkAddress(to);
       }
       mint(address, amount) {
           this.checkAmount(amount);
-          this.balance[address] = bnCal([
+          this.balance[address] = uintCal([
               this.balance[address] || "0",
               "add",
               amount,
           ]);
-          this._supply = bnCal([this._supply, "add", amount]);
+          this._supply = uintCal([this._supply, "add", amount]);
           this.checkAddress(address);
       }
       burn(address, amount) {
           this.checkAmount(amount);
-          this.balance[address] = bnCal([
+          this.balance[address] = uintCal([
               this.balance[address] || "0",
               "sub",
               amount,
           ]);
-          this._supply = bnCal([this._supply, "sub", amount]);
+          this._supply = uintCal([this._supply, "sub", amount]);
           this.checkAddress(address);
       }
       checkAmount(amount) {
@@ -240,6 +243,8 @@
       }
       addLiq(params) {
           const { tick0, tick1, amount0, amount1, expect, slippage1000 } = sortTickParams(params);
+          checkGtZero(amount0);
+          checkGtZero(amount1);
           checkGteZero(expect);
           checkSlippage(slippage1000);
           const pair = getPairStr(tick0, tick1);
@@ -250,22 +255,22 @@
               tick1,
           });
           if (this.assets.get(pair).supply == "0") {
-              const lp = bnCal([amount0, "mul", amount1, "sqrt"]);
-              const firstLP = bnCal([lp, "sub", "1000"]);
+              const lp = uintCal([amount0, "mul", amount1, "sqrt"]);
+              const firstLP = uintCal([lp, "sub", "1000"]);
               this.assets.get(pair).mint(address, firstLP);
               this.assets.get(pair).mint("0", "1000");
               this.assets.get(tick0).transfer(address, pair, amount0);
               this.assets.get(tick1).transfer(address, pair, amount1);
               checkGtZero(firstLP);
-              need(bn(firstLP).gte(bnCal([
+              need(bn(firstLP).gte(uintCal([
                   expect,
                   "mul",
-                  bnCal(["1000", "sub", slippage1000]),
+                  uintCal(["1000", "sub", slippage1000]),
                   "div",
                   "1000",
               ])), exceeding_slippage);
               if (this.config.platformFeeOn) {
-                  this.status.kLast[pair] = bnCal([
+                  this.status.kLast[pair] = uintCal([
                       this.assets.get(tick0).balanceOf(pair),
                       "mul",
                       this.assets.get(tick1).balanceOf(pair),
@@ -279,12 +284,18 @@
               const poolLp = this.assets.get(pair).supply;
               const poolAmount0 = this.assets.get(tick0).balanceOf(pair);
               const poolAmount1 = this.assets.get(tick1).balanceOf(pair);
-              amount1Adjust = bnCal([amount0, "mul", poolAmount1, "div", poolAmount0]);
+              amount1Adjust = uintCal([
+                  amount0,
+                  "mul",
+                  poolAmount1,
+                  "div",
+                  poolAmount0,
+              ]);
               if (bn(amount1Adjust).lte(amount1)) {
                   amount0Adjust = amount0;
               }
               else {
-                  amount0Adjust = bnCal([
+                  amount0Adjust = uintCal([
                       amount1,
                       "mul",
                       poolAmount0,
@@ -293,23 +304,23 @@
                   ]);
                   amount1Adjust = amount1;
               }
-              const lp0 = bnCal([amount0Adjust, "mul", poolLp, "div", poolAmount0]);
-              const lp1 = bnCal([amount1Adjust, "mul", poolLp, "div", poolAmount1]);
+              const lp0 = uintCal([amount0Adjust, "mul", poolLp, "div", poolAmount0]);
+              const lp1 = uintCal([amount1Adjust, "mul", poolLp, "div", poolAmount1]);
               const lp = bn(lp0).lt(lp1) ? lp0 : lp1;
               this.assets.get(pair).mint(address, lp);
               this.assets.get(tick0).transfer(address, pair, amount0Adjust);
               this.assets.get(tick1).transfer(address, pair, amount1Adjust);
               checkGtZero(lp);
-              need(bn(lp).gte(bnCal([
+              need(bn(lp).gte(uintCal([
                   expect,
                   "mul",
-                  bnCal(["1000", "sub", slippage1000]),
+                  uintCal(["1000", "sub", slippage1000]),
                   "div",
                   "1000",
               ])), exceeding_slippage);
               need(amount1Adjust == amount1 || amount0Adjust == amount0);
               if (this.config.platformFeeOn) {
-                  this.status.kLast[pair] = bnCal([
+                  this.status.kLast[pair] = uintCal([
                       this.assets.get(tick0).balanceOf(pair),
                       "mul",
                       this.assets.get(tick1).balanceOf(pair),
@@ -320,6 +331,7 @@
       }
       removeLiq(params) {
           const { address, lp, tick0, tick1, amount0, amount1, slippage1000 } = sortTickParams(params);
+          checkGtZero(lp);
           checkGteZero(amount0);
           checkGteZero(amount1);
           checkSlippage(slippage1000);
@@ -332,27 +344,27 @@
           const poolLp = this.assets.get(pair).supply;
           const reserve0 = this.assets.get(tick0).balanceOf(pair);
           const reserve1 = this.assets.get(tick1).balanceOf(pair);
-          const acquire0 = bnCal([lp, "mul", reserve0, "div", poolLp]);
-          const acquire1 = bnCal([lp, "mul", reserve1, "div", poolLp]);
+          const acquire0 = uintCal([lp, "mul", reserve0, "div", poolLp]);
+          const acquire1 = uintCal([lp, "mul", reserve1, "div", poolLp]);
           this.assets.get(pair).burn(address, lp);
           this.assets.get(tick0).transfer(pair, address, acquire0);
           this.assets.get(tick1).transfer(pair, address, acquire1);
-          need(bn(acquire0).gte(bnCal([
+          need(bn(acquire0).gte(uintCal([
               amount0,
               "mul",
-              bnCal(["1000", "sub", slippage1000]),
+              uintCal(["1000", "sub", slippage1000]),
               "div",
               "1000",
           ])), exceeding_slippage);
-          need(bn(acquire1).gte(bnCal([
+          need(bn(acquire1).gte(uintCal([
               amount1,
               "mul",
-              bnCal(["1000", "sub", slippage1000]),
+              uintCal(["1000", "sub", slippage1000]),
               "div",
               "1000",
           ])), exceeding_slippage);
           if (this.config.platformFeeOn) {
-              this.status.kLast[pair] = bnCal([
+              this.status.kLast[pair] = uintCal([
                   this.assets.get(tick0).balanceOf(pair),
                   "mul",
                   this.assets.get(tick1).balanceOf(pair),
@@ -362,6 +374,7 @@
       }
       swap(params) {
           const { tick0, tick1, address, tick, exactType, expect, slippage1000, amount, } = sortTickParams(params);
+          checkGtZero(amount);
           checkGteZero(expect);
           checkSlippage(slippage1000);
           const pair = getPairStr(tick0, tick1);
@@ -375,15 +388,15 @@
           if (exactType == ExactType.exactIn) {
               amountIn = amount;
               if (tick == tick0) {
-                  (reserveIn = this.assets.get(tick0).balanceOf(pair)),
-                      (reserveOut = this.assets.get(tick1).balanceOf(pair)),
-                      (tickIn = tick0);
+                  reserveIn = this.assets.get(tick0).balanceOf(pair);
+                  reserveOut = this.assets.get(tick1).balanceOf(pair);
+                  tickIn = tick0;
                   tickOut = tick1;
               }
               else {
-                  (reserveIn = this.assets.get(tick1).balanceOf(pair)),
-                      (reserveOut = this.assets.get(tick0).balanceOf(pair)),
-                      (tickIn = tick1);
+                  reserveIn = this.assets.get(tick1).balanceOf(pair);
+                  reserveOut = this.assets.get(tick0).balanceOf(pair);
+                  tickIn = tick1;
                   tickOut = tick0;
               }
               amountOut = this.getAmountOut({
@@ -391,10 +404,10 @@
                   reserveIn,
                   reserveOut,
               });
-              const amountOutMin = bnCal([
+              const amountOutMin = uintCal([
                   expect,
                   "mul",
-                  bnCal(["1000", "div", bnCal(["1000", "add", slippage1000])]),
+                  uintCal(["1000", "div", uintCal(["1000", "add", slippage1000])]),
               ]);
               need(bn(amountOut).gte(amountOutMin), exceeding_slippage);
               ret = amountOut;
@@ -418,10 +431,10 @@
                   reserveIn,
                   reserveOut,
               });
-              const amountInMax = bnCal([
+              const amountInMax = uintCal([
                   expect,
                   "mul",
-                  bnCal(["1000", "add", slippage1000]),
+                  uintCal(["1000", "add", slippage1000]),
                   "div",
                   "1000",
               ]);
@@ -435,37 +448,38 @@
           const { amountIn, reserveIn, reserveOut } = params;
           checkGtZero(amountIn);
           need(bn(reserveIn).gt("0") && bn(reserveOut).gt("0"), insufficient_liquidity);
-          const amountInWithFee = bnCal([
+          const amountInWithFee = uintCal([
               amountIn,
               "mul",
-              bnCal(["1000", "sub", this.config.swapFeeRate1000]),
+              uintCal(["1000", "sub", this.config.swapFeeRate1000]),
           ]);
-          const numerator = bnCal([amountInWithFee, "mul", reserveOut]);
-          const denominator = bnCal([
+          const numerator = uintCal([amountInWithFee, "mul", reserveOut]);
+          const denominator = uintCal([
               reserveIn,
               "mul",
               "1000",
               "add",
               amountInWithFee,
           ]);
-          return bnCal([numerator, "div", denominator]);
+          return uintCal([numerator, "div", denominator]);
       }
       getAmountIn(params) {
           const { amountOut, reserveIn, reserveOut } = params;
           checkGtZero(amountOut);
           need(bn(reserveIn).gt("0") && bn(reserveOut).gt("0"), insufficient_liquidity);
-          const numerator = bnCal([reserveIn, "mul", amountOut, "mul", "1000"]);
-          const denominator = bnCal([
+          const numerator = uintCal([reserveIn, "mul", amountOut, "mul", "1000"]);
+          const denominator = uintCal([
               reserveOut,
               "sub",
               amountOut,
               "mul",
-              bnCal(["1000", "sub", this.config.swapFeeRate1000]),
+              uintCal(["1000", "sub", this.config.swapFeeRate1000]),
           ]);
-          return bnCal([numerator, "div", denominator, "add", "1"]);
+          return uintCal([numerator, "div", denominator, "add", "1"]);
       }
       send(params) {
           const { from, to, tick, amount } = params;
+          checkGtZero(amount);
           this.assets.get(tick).transfer(from, to, amount);
           return {};
       }
@@ -476,17 +490,17 @@
           const reserve1 = this.assets.get(tick1).balanceOf(pair);
           if (this.config.platformFeeOn) {
               if (bn(this.status.kLast[pair]).gt("0")) {
-                  const rootK = bnCal([reserve0, "mul", reserve1, "sqrt"]);
-                  const rootKLast = bnCal([this.status.kLast[pair], "sqrt"]);
+                  const rootK = uintCal([reserve0, "mul", reserve1, "sqrt"]);
+                  const rootKLast = uintCal([this.status.kLast[pair], "sqrt"]);
                   if (bn(rootK).gt(rootKLast)) {
-                      const numerator = bnCal([
+                      const numerator = uintCal([
                           this.assets.get(pair).supply,
                           "mul",
-                          bnCal([rootK, "sub", rootKLast]),
+                          uintCal([rootK, "sub", rootKLast]),
                       ]);
-                      const scale = bnCal([this.config.platformFeeRate, "sub", "1"]);
-                      const denominator = bnCal([rootK, "mul", scale, "add", rootKLast]);
-                      const liquidity = bnCal([numerator, "div", denominator]);
+                      const scale = uintCal([this.config.platformFeeRate, "sub", "1"]);
+                      const denominator = uintCal([rootK, "mul", scale, "add", rootKLast]);
+                      const liquidity = uintCal([numerator, "div", denominator]);
                       this.assets.get(pair).mint(this.config.sequencer, liquidity);
                   }
               }

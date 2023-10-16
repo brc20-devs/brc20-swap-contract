@@ -13,7 +13,7 @@ bn.config({
 export type BnCalSymbol = "add" | "sub" | "mul" | "div" | "sqrt";
 
 export function bnInt(value: string, decimal: string) {
-  return bnCal([value, "mul", bnCal(["10", "pow", decimal])]);
+  return uintCal([value, "mul", uintCal(["10", "pow", decimal])]);
 }
 
 export function bnDecimalPlacesValid(amount: string, decimal: string) {
@@ -32,14 +32,14 @@ export function bnDecimal(value: string, decimal: string) {
     .toString();
 }
 
-export function bnCal(
+function _bnCal(
   items: (BnCalSymbol | BigNumber.Value)[],
-  decimalPlaces?: string
+  decimalPlaces: string
 ): string {
   const _bn = bn.clone();
   _bn.config({
     EXPONENTIAL_AT: 1e9,
-    DECIMAL_PLACES: decimalPlaces ? parseInt(decimalPlaces) : 0,
+    DECIMAL_PLACES: parseInt(decimalPlaces),
     ROUNDING_MODE: bn.ROUND_DOWN,
   });
   let ret = _bn(items[0]);
@@ -53,7 +53,7 @@ export function bnCal(
       ret = ret.plus(next);
       i++;
     } else if (cur == "sub") {
-      need(_bn(next).gte("0"));
+      need(_bn(ret).gte(next));
       ret = ret.minus(next);
       i++;
     } else if (cur == "mul") {
@@ -61,7 +61,7 @@ export function bnCal(
       ret = ret.times(next);
       i++;
     } else if (cur == "div") {
-      need(_bn(next).gte("0"));
+      need(_bn(next).gt("0"));
       ret = ret.div(next);
       i++;
     } else if (cur == "pow") {
@@ -80,4 +80,8 @@ export function bnCal(
   } else {
     return ret.toString();
   }
+}
+
+export function uintCal(items: (BnCalSymbol | BigNumber.Value)[]): string {
+  return _bnCal(items, "0");
 }

@@ -1,4 +1,4 @@
-import { bn, bnCal } from "./bn";
+import { bn, uintCal } from "./bn";
 import { need } from "./contract-utils";
 
 export class Brc20 {
@@ -11,7 +11,7 @@ export class Brc20 {
     this.tick = tick;
     this._supply = "0";
     for (const address in this.balance) {
-      this._supply = bnCal([this._supply, "add", this.balance[address]]);
+      this._supply = uintCal([this._supply, "add", this.balance[address]]);
     }
   }
 
@@ -25,31 +25,31 @@ export class Brc20 {
 
   transfer(from: string, to: string, amount: string) {
     this.checkAmount(amount);
-    this.balance[from] = bnCal([this.balance[from], "sub", amount]);
-    this.balance[to] = bnCal([this.balance[to] || "0", "add", amount]);
+    this.balance[from] = uintCal([this.balance[from], "sub", amount]);
+    this.balance[to] = uintCal([this.balance[to] || "0", "add", amount]);
     this.checkAddress(from);
     this.checkAddress(to);
   }
 
   mint(address: string, amount: string) {
     this.checkAmount(amount);
-    this.balance[address] = bnCal([
+    this.balance[address] = uintCal([
       this.balance[address] || "0",
       "add",
       amount,
     ]);
-    this._supply = bnCal([this._supply, "add", amount]);
+    this._supply = uintCal([this._supply, "add", amount]);
     this.checkAddress(address);
   }
 
   burn(address: string, amount: string) {
     this.checkAmount(amount);
-    this.balance[address] = bnCal([
+    this.balance[address] = uintCal([
       this.balance[address] || "0",
       "sub",
       amount,
     ]);
-    this._supply = bnCal([this._supply, "sub", amount]);
+    this._supply = uintCal([this._supply, "sub", amount]);
     this.checkAddress(address);
   }
 
