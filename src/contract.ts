@@ -27,9 +27,10 @@ import {
 import { Assets } from "./assets";
 
 const exceeding_slippage = "exceeding slippage";
-const pool_existed = "pool existed";
 const duplicate_tick = "duplicate tick";
 const insufficient_liquidity = "insufficient liquidity for this trade";
+const pool_existed = "pool existed";
+const pool_not_found = "pool not found";
 
 export class Contract {
   readonly assets: Assets;
@@ -49,8 +50,9 @@ export class Contract {
     need(params.tick0 !== params.tick1, duplicate_tick);
 
     const pair = getPairStr(params.tick0, params.tick1);
-    need(!this.assets.pool[pair], pool_existed);
-    this.assets.pool[pair] = { amount0: "0", amount1: "0", lp: "0" };
+    need(!this.assets.isExist(pair), pool_existed);
+
+    this.assets.tryCreate(pair);
     return {};
   }
 
@@ -62,22 +64,24 @@ export class Contract {
     checkSlippage(slippage1000);
 
     const pair = getPairStr(tick0, tick1);
-    const pool = this.assets.pool[pair];
     const { address } = params;
+    need(!!this.assets.isExist(pair), pool_not_found);
 
     this.mintFee({
       tick0,
       tick1,
     });
 
-    if (pool.lp == "0") {
+    if (this.assets.get(pair).supply == "0") {
       const lp = bnCal([amount0, "mul", amount1, "sqrt"]);
 
       // ensure there is always liquidity in the pool
       const firstLP = bnCal([lp, "sub", "1000"]);
 
-      this.assets.mintLp(address, pair, firstLP, amount0, amount1);
-      this.assets.mintLp("0", pair, "1000");
+      this.assets.get(pair).mint(address, firstLP);
+      this.assets.get(pair).mint("0", "1000");
+      this.assets.get(tick0).transfer(address, pair, amount0);
+      this.assets.get(tick1).transfer(address, pair, amount1);
 
       checkGtZero(firstLP);
       need(
@@ -94,7 +98,11 @@ export class Contract {
       );
 
       if (this.config.platformFeeOn) {
-        this.status.kLast[pair] = bnCal([pool.amount0, "mul", pool.amount1]);
+        this.status.kLast[pair] = bnCal([
+          this.assets.get(tick0).balanceOf(pair),
+          "mul",
+          this.assets.get(tick1).balanceOf(pair),
+        ]);
       }
 
       return { lp: firstLP, amount0, amount1 };
@@ -102,31 +110,31 @@ export class Contract {
       let amount0Adjust: string;
       let amount1Adjust: string;
 
-      amount1Adjust = bnCal([
-        amount0,
-        "mul",
-        pool.amount1,
-        "div",
-        pool.amount0,
-      ]);
+      const poolLp = this.assets.get(pair).supply;
+      const poolAmount0 = this.assets.get(tick0).balanceOf(pair);
+      const poolAmount1 = this.assets.get(tick1).balanceOf(pair);
+
+      amount1Adjust = bnCal([amount0, "mul", poolAmount1, "div", poolAmount0]);
       if (bn(amount1Adjust).lte(amount1)) {
         amount0Adjust = amount0;
       } else {
         amount0Adjust = bnCal([
           amount1,
           "mul",
-          pool.amount0,
+          poolAmount0,
           "div",
-          pool.amount1,
+          poolAmount1,
         ]);
         amount1Adjust = amount1;
       }
 
-      const lp0 = bnCal([amount0Adjust, "mul", pool.lp, "div", pool.amount0]);
-      const lp1 = bnCal([amount1Adjust, "mul", pool.lp, "div", pool.amount1]);
+      const lp0 = bnCal([amount0Adjust, "mul", poolLp, "div", poolAmount0]);
+      const lp1 = bnCal([amount1Adjust, "mul", poolLp, "div", poolAmount1]);
       const lp = bn(lp0).lt(lp1) ? lp0 : lp1;
 
-      this.assets.mintLp(address, pair, lp, amount0Adjust, amount1Adjust);
+      this.assets.get(pair).mint(address, lp);
+      this.assets.get(tick0).transfer(address, pair, amount0Adjust);
+      this.assets.get(tick1).transfer(address, pair, amount1Adjust);
 
       checkGtZero(lp);
       need(
@@ -144,7 +152,11 @@ export class Contract {
       need(amount1Adjust == amount1 || amount0Adjust == amount0);
 
       if (this.config.platformFeeOn) {
-        this.status.kLast[pair] = bnCal([pool.amount0, "mul", pool.amount1]);
+        this.status.kLast[pair] = bnCal([
+          this.assets.get(tick0).balanceOf(pair),
+          "mul",
+          this.assets.get(tick1).balanceOf(pair),
+        ]);
       }
 
       return { lp, amount0: amount0Adjust, amount1: amount1Adjust };
@@ -165,14 +177,17 @@ export class Contract {
     });
 
     const pair = getPairStr(tick0, tick1);
-    const pool = this.assets.pool[pair];
-    const poolLp = pool.lp;
-    const reserve0 = pool.amount0;
-    const reserve1 = pool.amount1;
+    need(!!this.assets.isExist(pair), pool_not_found);
+
+    const poolLp = this.assets.get(pair).supply;
+    const reserve0 = this.assets.get(tick0).balanceOf(pair);
+    const reserve1 = this.assets.get(tick1).balanceOf(pair);
     const acquire0 = bnCal([lp, "mul", reserve0, "div", poolLp]);
     const acquire1 = bnCal([lp, "mul", reserve1, "div", poolLp]);
 
-    this.assets.burnLp(address, pair, lp, acquire0, acquire1);
+    this.assets.get(pair).burn(address, lp);
+    this.assets.get(tick0).transfer(pair, address, acquire0);
+    this.assets.get(tick1).transfer(pair, address, acquire1);
 
     need(
       bn(acquire0).gte(
@@ -200,7 +215,11 @@ export class Contract {
     );
 
     if (this.config.platformFeeOn) {
-      this.status.kLast[pair] = bnCal([pool.amount0, "mul", pool.amount1]);
+      this.status.kLast[pair] = bnCal([
+        this.assets.get(tick0).balanceOf(pair),
+        "mul",
+        this.assets.get(tick1).balanceOf(pair),
+      ]);
     }
 
     return { tick0, tick1, amount0: acquire0, amount1: acquire1 };
@@ -222,7 +241,6 @@ export class Contract {
     checkSlippage(slippage1000);
 
     const pair = getPairStr(tick0, tick1);
-    const pool = this.assets.pool[pair];
 
     let amountIn: string;
     let amountOut: string;
@@ -235,13 +253,13 @@ export class Contract {
     if (exactType == ExactType.exactIn) {
       amountIn = amount;
       if (tick == tick0) {
-        reserveIn = pool.amount0;
-        reserveOut = pool.amount1;
+        reserveIn = this.assets.get(tick0).balanceOf(pair);
+        reserveOut = this.assets.get(tick1).balanceOf(pair);
         tickIn = tick0;
         tickOut = tick1;
       } else {
-        reserveIn = pool.amount1;
-        reserveOut = pool.amount0;
+        reserveIn = this.assets.get(tick1).balanceOf(pair);
+        reserveOut = this.assets.get(tick0).balanceOf(pair);
         tickIn = tick1;
         tickOut = tick0;
       }
@@ -263,13 +281,13 @@ export class Contract {
     } else {
       amountOut = amount;
       if (tick == tick0) {
-        reserveIn = pool.amount1;
-        reserveOut = pool.amount0;
+        reserveIn = this.assets.get(tick1).balanceOf(pair);
+        reserveOut = this.assets.get(tick0).balanceOf(pair);
         tickIn = tick1;
         tickOut = tick0;
       } else {
-        reserveIn = pool.amount0;
-        reserveOut = pool.amount1;
+        reserveIn = this.assets.get(tick0).balanceOf(pair);
+        reserveOut = this.assets.get(tick1).balanceOf(pair);
         tickIn = tick0;
         tickOut = tick1;
       }
@@ -341,9 +359,7 @@ export class Contract {
 
   public send(params: SendIn): SendOut {
     const { from, to, tick, amount } = params;
-
-    this.assets.transfer(from, to, tick, amount);
-
+    this.assets.get(tick).transfer(from, to, amount);
     return {};
   }
 
@@ -351,11 +367,9 @@ export class Contract {
     const { tick0, tick1 } = params;
 
     const pair = getPairStr(tick0, tick1);
-    const pool = this.assets.pool[pair];
-    this.assets.checkPool(pair);
 
-    const reserve0 = pool.amount0 || "0";
-    const reserve1 = pool.amount1 || "0";
+    const reserve0 = this.assets.get(tick0).balanceOf(pair);
+    const reserve1 = this.assets.get(tick1).balanceOf(pair);
 
     if (this.config.platformFeeOn) {
       if (bn(this.status.kLast[pair]).gt("0")) {
@@ -363,18 +377,15 @@ export class Contract {
         const rootKLast = bnCal([this.status.kLast[pair], "sqrt"]);
         if (bn(rootK).gt(rootKLast)) {
           const numerator = bnCal([
-            pool.lp,
+            this.assets.get(pair).supply,
             "mul",
             bnCal([rootK, "sub", rootKLast]),
           ]);
           const scale = bnCal([this.config.platformFeeRate, "sub", "1"]);
           const denominator = bnCal([rootK, "mul", scale, "add", rootKLast]);
           const liquidity = bnCal([numerator, "div", denominator]);
-          pool.lp = bnCal([pool.lp, "add", liquidity]);
 
-          const sequencer = this.config.sequencer;
-
-          this.assets.mintLp(sequencer, pair, liquidity);
+          this.assets.get(pair).mint(this.config.sequencer, liquidity);
         }
       }
     } else {

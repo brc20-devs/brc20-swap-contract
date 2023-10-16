@@ -2,165 +2,82 @@ import { Balance, Pool } from "./types";
 import { bn, bnCal } from "./bn";
 import { getPairStr, getPairStruct, need } from "./contract-utils";
 
-type AssetType =
-  | "approval"
-  | "withdrawable"
-  | "pendingApproval"
-  | "pendingWithdrawable";
+import { Brc20 } from "./brc20";
 
-const invalid_amount = "invalid amount";
-const insufficient_amount = "insufficient amount";
-const pool_not_found = "pool not found";
+type AssetType =
+  | "swap"
+  | "pendingSwap"
+  | "module"
+  | "approve"
+  | "conditionalApprove";
 
 export class Assets {
-  readonly pool: Pool;
-  readonly approval: Balance;
-  readonly withdrawable: Balance;
-  readonly pendingApproval: Balance;
-  readonly pendingWithdrawable: Balance;
+  // assetType --> tick --> brc20
+  private map: { [key: string]: { [key: string]: Brc20 } } = {};
 
-  constructor(assets: {
-    pool: Pool;
-    approval: Balance;
-    withdrawable: Balance;
-    pendingApproval: Balance;
-    pendingWithdrawable: Balance;
+  constructor(map: {
+    [key: string]: { [key: string]: { balance: any; tick: string } };
   }) {
-    this.pool = assets.pool;
-    this.approval = assets.approval;
-    this.withdrawable = assets.withdrawable;
-    this.pendingApproval = assets.pendingApproval;
-    this.pendingWithdrawable = assets.pendingWithdrawable;
-  }
-
-  checkPool(pair: string) {
-    need(!!this.pool[pair], pool_not_found);
-  }
-
-  getBalance(address: string, assetType: AssetType, tick: string): string {
-    return this[assetType][address]?.[tick] || "0";
-  }
-
-  mintTick(address: string, tick: string, amount: string) {
-    need(bn(amount).gt("0"), invalid_amount);
-    if (!this.pendingApproval[address]) {
-      this.pendingApproval[address] = {};
+    for (const assetType in map) {
+      for (const tick in map[assetType]) {
+        const brc20 = new Brc20(
+          map[assetType][tick].balance,
+          map[assetType][tick].tick
+        );
+        map[assetType][tick] = brc20;
+      }
     }
-    this.pendingApproval[address][tick] = bnCal([
-      this.pendingApproval[address][tick] || "0",
-      "add",
-      amount,
-    ]);
+    this.map = map as any;
   }
 
-  mintLp(
+  traverseTick(assetType: AssetType, cb: (brc20: Brc20) => void) {
+    for (const tick in this.map[assetType]) {
+      const brc20 = this.map[assetType][tick];
+      cb(brc20);
+    }
+  }
+
+  tryCreate(tick: string) {
+    for (let assetType in this.map) {
+      if (!this.map[assetType][tick]) {
+        this.map[assetType][tick] = new Brc20({}, tick);
+      }
+    }
+  }
+
+  isExist(tick: string) {
+    return !!this.map["swap"][tick];
+  }
+
+  get(tick: string, assetType: AssetType = "swap") {
+    return this.map[assetType][tick];
+  }
+
+  getBalance(
     address: string,
-    pair: string,
-    lp: string,
-    amount0?: string,
-    amount1?: string
-  ) {
-    need(bn(lp).gt("0"), invalid_amount);
-
-    this.checkPool(pair);
-    const { tick0, tick1 } = getPairStruct(pair);
-
-    this.pool[pair].lp = bnCal([this.pool[pair].lp || "0", "add", lp]);
-    if (!this.approval[address]) {
-      this.approval[address] = {};
-    }
-    this.approval[address][pair] = bnCal([
-      this.approval[address][pair] || "0",
-      "add",
-      lp,
-    ]);
-
-    if (amount0) {
-      need(bn(amount0).gt("0"), invalid_amount);
-      this.pool[pair].amount0 = bnCal([
-        this.pool[pair].amount0 || "0",
-        "add",
-        amount0,
-      ]);
-      this.approval[address][tick0] = bnCal([
-        this.approval[address][tick0] || "0",
-        "sub",
-        amount0,
-      ]);
-    }
-    if (amount1) {
-      need(bn(amount1).gt("0"), invalid_amount);
-      this.pool[pair].amount1 = bnCal([
-        this.pool[pair].amount1 || "0",
-        "add",
-        amount1,
-      ]);
-      this.approval[address][tick1] = bnCal([
-        this.approval[address][tick1] || "0",
-        "sub",
-        amount1,
-      ]);
-    }
-
-    need(bn(this.pool[pair].lp).gte("0"), insufficient_amount);
-    need(bn(this.pool[pair].amount0).gte("0"), insufficient_amount);
-    need(bn(this.pool[pair].amount1).gte("0"), insufficient_amount);
-    need(bn(this.approval[address][pair]).gte("0"), insufficient_amount);
-    if (amount0) {
-      need(bn(this.approval[address][tick0]).gte("0"), insufficient_amount);
-    }
-    if (amount1) {
-      need(bn(this.approval[address][tick1]).gte("0"), insufficient_amount);
-    }
+    tick: string,
+    assetType: AssetType = "swap"
+  ): string {
+    return this.map[assetType][tick].balanceOf(address);
   }
 
-  burnLp(
+  mint(
     address: string,
-    pair: string,
-    lp: string,
-    amount0: string,
-    amount1: string
+    tick: string,
+    amount: string,
+    assetType: AssetType = "swap"
   ) {
-    need(bn(lp).gt("0"), invalid_amount);
-    need(bn(amount0).gt("0"), invalid_amount);
-    need(bn(amount1).gt("0"), invalid_amount);
+    this.tryCreate(tick);
+    this.map[assetType][tick].mint(address, amount);
+  }
 
-    this.checkPool(pair);
-    const { tick0, tick1 } = getPairStruct(pair);
-
-    this.pool[pair].lp = bnCal([this.pool[pair].lp, "sub", lp]);
-    this.pool[pair].amount0 = bnCal([
-      this.pool[pair].amount0 || "0",
-      "sub",
-      amount0,
-    ]);
-    this.pool[pair].amount1 = bnCal([
-      this.pool[pair].amount1 || "0",
-      "sub",
-      amount1,
-    ]);
-    this.approval[address][pair] = bnCal([
-      this.approval[address][pair] || "0",
-      "sub",
-      lp,
-    ]);
-    this.approval[address][tick0] = bnCal([
-      this.approval[address][tick0] || "0",
-      "add",
-      amount0,
-    ]);
-    this.approval[address][tick1] = bnCal([
-      this.approval[address][tick1] || "0",
-      "add",
-      amount1,
-    ]);
-
-    need(bn(this.pool[pair].lp).gte("0"), insufficient_amount);
-    need(bn(this.pool[pair].amount0).gte("0"), insufficient_amount);
-    need(bn(this.pool[pair].amount1).gte("0"), insufficient_amount);
-    need(bn(this.approval[address][pair]).gte("0"), insufficient_amount);
-    need(bn(this.approval[address][tick0]).gte("0"), insufficient_amount);
-    need(bn(this.approval[address][tick1]).gte("0"), insufficient_amount);
+  burn(
+    address: string,
+    tick: string,
+    amount: string,
+    assetType: AssetType = "swap"
+  ) {
+    this.map[assetType][tick].burn(address, amount);
   }
 
   convert(
@@ -170,45 +87,20 @@ export class Assets {
     fromAssetType: AssetType,
     toAssetType: AssetType
   ) {
-    need(bn(amount).gt("0"), invalid_amount);
-    need(
-      bn(this[fromAssetType][address]?.[tick]).gte(amount),
-      insufficient_amount
-    );
-    need(fromAssetType !== toAssetType);
-
-    this[fromAssetType][address][tick] = bnCal([
-      this[fromAssetType][address][tick],
-      "sub",
-      amount,
-    ]);
-    if (!this[toAssetType][address]) {
-      this[toAssetType][address] = {};
-    }
-    this[toAssetType][address][tick] = bnCal([
-      this[toAssetType][address][tick] || "0",
-      "add",
-      amount,
-    ]);
+    this.map[fromAssetType][tick].burn(address, amount);
+    this.map[toAssetType][tick].mint(address, amount);
   }
 
-  transfer(from: string, to: string, tick: string, amount: string) {
-    need(bn(amount).gt("0"), invalid_amount);
-    need(bn(this.approval[from][tick]).gte(amount), insufficient_amount);
-
-    this.approval[from][tick] = bnCal([
-      this.approval[from][tick] || "0",
-      "sub",
-      amount,
-    ]);
-    this.approval[to][tick] = bnCal([
-      this.approval[to][tick] || "0",
-      "add",
-      amount,
-    ]);
-
-    need(bn(this.approval[from][tick]).gte("0"), insufficient_amount);
-    need(bn(this.approval[to][tick]).gte("0"), insufficient_amount);
+  transfer(
+    tick: string,
+    from: string,
+    to: string,
+    amount: string,
+    fromAssetType: AssetType,
+    toAssetType: AssetType
+  ) {
+    this.map[fromAssetType][tick].burn(from, amount);
+    this.map[toAssetType][tick].mint(to, amount);
   }
 
   swap(
@@ -216,62 +108,15 @@ export class Assets {
     tickIn: string,
     tickOut: string,
     amountIn: string,
-    amountOut: string
+    amountOut: string,
+    assetType: AssetType = "swap"
   ) {
     const pair = getPairStr(tickIn, tickOut);
-    const { tick0 } = getPairStruct(pair);
-    need(bn(amountIn).gt("0"), invalid_amount);
-    need(bn(amountOut).gt("0"), invalid_amount);
-
-    if (tickIn == tick0) {
-      this.pool[pair].amount0 = bnCal([
-        this.pool[pair].amount0,
-        "add",
-        amountIn,
-      ]);
-      this.pool[pair].amount1 = bnCal([
-        this.pool[pair].amount1,
-        "sub",
-        amountOut,
-      ]);
-    } else {
-      this.pool[pair].amount1 = bnCal([
-        this.pool[pair].amount1,
-        "add",
-        amountIn,
-      ]);
-      this.pool[pair].amount0 = bnCal([
-        this.pool[pair].amount0,
-        "sub",
-        amountOut,
-      ]);
-    }
-
-    this.approval[address][tickIn] = bnCal([
-      this.approval[address][tickIn],
-      "sub",
-      amountIn,
-    ]);
-    this.approval[address][tickOut] = bnCal([
-      this.approval[address][tickOut] || "0",
-      "add",
-      amountOut,
-    ]);
-
-    need(bn(this.pool[pair].lp).gte("0"), insufficient_amount);
-    need(bn(this.pool[pair].amount0).gte("0"), insufficient_amount);
-    need(bn(this.pool[pair].amount1).gte("0"), insufficient_amount);
-    need(bn(this.approval[address][tickIn]).gte("0"), insufficient_amount);
-    need(bn(this.approval[address][tickOut]).gte("0"), insufficient_amount);
+    this.map[assetType][tickIn].transfer(address, pair, amountIn);
+    this.map[assetType][tickOut].transfer(pair, address, amountOut);
   }
 
   dataRefer() {
-    return {
-      pool: this.pool,
-      approval: this.approval,
-      withdrawable: this.withdrawable,
-      pendingApproval: this.pendingApproval,
-      pendingWithdrawable: this.pendingWithdrawable,
-    };
+    return this.map;
   }
 }

@@ -7,16 +7,16 @@ import { bnCal } from "../src/bn";
 describe("Contract Test", () => {
   it("addLiq", async () => {
     const assets = new Assets({
-      pool: {},
-      approval: {
-        "1": {
-          ordi: bnCal(["10000", "mul", "1e18"]),
-          sats: bnCal(["50000", "mul", "1e18"]),
+      swap: {
+        ordi: {
+          balance: { "1": bnCal(["10000", "mul", "1e18"]) },
+          tick: "ordi",
+        },
+        sats: {
+          balance: { "1": bnCal(["50000", "mul", "1e18"]) },
+          tick: "sats",
         },
       },
-      withdrawable: {},
-      pendingApproval: {},
-      pendingWithdrawable: {},
     });
     const contractStatus = {
       kLast: {},
@@ -39,6 +39,6 @@ describe("Contract Test", () => {
       expect: "0",
       slippage1000: "0",
     });
-    expect(liqOut.lp === "22360679774997896964091");
+    expect(liqOut.lp).eq("22360679774997896963091");
   });
 });

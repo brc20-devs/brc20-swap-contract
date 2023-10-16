@@ -1,0 +1,63 @@
+import { bn, bnCal } from "./bn";
+import { need } from "./contract-utils";
+
+export class Brc20 {
+  readonly balance: { [key: string]: string } = {};
+  readonly tick: string;
+  private _supply: string;
+
+  constructor(balance: { [key: string]: string }, tick: string) {
+    this.balance = balance;
+    this.tick = tick;
+    this._supply = "0";
+    for (const address in this.balance) {
+      this._supply = bnCal([this._supply, "add", this.balance[address]]);
+    }
+  }
+
+  get supply() {
+    return this._supply;
+  }
+
+  balanceOf(address: string) {
+    return this.balance[address] || "0";
+  }
+
+  transfer(from: string, to: string, amount: string) {
+    this.checkAmount(amount);
+    this.balance[from] = bnCal([this.balance[from], "sub", amount]);
+    this.balance[to] = bnCal([this.balance[to] || "0", "add", amount]);
+    this.checkAddress(from);
+    this.checkAddress(to);
+  }
+
+  mint(address: string, amount: string) {
+    this.checkAmount(amount);
+    this.balance[address] = bnCal([
+      this.balance[address] || "0",
+      "add",
+      amount,
+    ]);
+    this._supply = bnCal([this._supply, "add", amount]);
+    this.checkAddress(address);
+  }
+
+  burn(address: string, amount: string) {
+    this.checkAmount(amount);
+    this.balance[address] = bnCal([
+      this.balance[address] || "0",
+      "sub",
+      amount,
+    ]);
+    this._supply = bnCal([this._supply, "sub", amount]);
+    this.checkAddress(address);
+  }
+
+  private checkAmount(amount: string) {
+    need(bn(amount).gt("0"), "invalid amount");
+  }
+
+  private checkAddress(address: string) {
+    need(bn(this.balance[address]).gte("0"), "insufficient amount");
+  }
+}
