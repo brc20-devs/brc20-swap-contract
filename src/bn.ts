@@ -12,7 +12,7 @@ bn.config({
 
 export type BnCalSymbol = "add" | "sub" | "mul" | "div" | "sqrt";
 
-export function bnInt(value: string, decimal: string) {
+export function bnUint(value: string, decimal: string) {
   return uintCal([value, "mul", uintCal(["10", "pow", decimal])]);
 }
 
