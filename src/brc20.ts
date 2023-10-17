@@ -25,6 +25,7 @@ export class Brc20 {
 
   transfer(from: string, to: string, amount: string) {
     this.checkAmount(amount);
+    this.checkAddress(from, amount);
     this.balance[from] = uintCal([this.balance[from], "sub", amount]);
     this.balance[to] = uintCal([this.balance[to] || "0", "add", amount]);
     this.checkAddress(from);
@@ -44,6 +45,7 @@ export class Brc20 {
 
   burn(address: string, amount: string) {
     this.checkAmount(amount);
+    this.checkAddress(address, amount);
     this.balance[address] = uintCal([
       this.balance[address] || "0",
       "sub",
@@ -54,10 +56,13 @@ export class Brc20 {
   }
 
   private checkAmount(amount: string) {
-    need(bn(amount).gt("0"), "invalid amount");
+    need(bn(amount).gt("0"), "invalid amount: " + this.tick);
   }
 
-  private checkAddress(address: string) {
-    need(bn(this.balance[address]).gte("0"), "insufficient amount");
+  private checkAddress(address: string, value = "0") {
+    need(
+      bn(this.balance[address]).gte(value),
+      "insufficient amount: " + this.tick
+    );
   }
 }
