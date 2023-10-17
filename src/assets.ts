@@ -5,9 +5,12 @@ import { getPairStr, getPairStruct, need } from "./contract-utils";
 import { Brc20 } from "./brc20";
 
 type AssetType =
+  // swap
   | "swap"
   | "pendingSwap"
-  | "module"
+  // module
+  | "available"
+  | "pendingAvailable"
   | "approve"
   | "conditionalApprove";
 
@@ -56,9 +59,24 @@ export class Assets {
   getBalance(
     address: string,
     tick: string,
-    assetType: AssetType = "swap"
+    assetType: AssetType | "module" = "swap"
   ): string {
-    return this.map[assetType][tick].balanceOf(address);
+    try {
+      if (assetType == "module") {
+        return uintCal([
+          this.map["available"][tick].balanceOf(address),
+          "add",
+          this.map["approve"][tick].balanceOf(address),
+          "add",
+          this.map["conditionalApprove"][tick].balanceOf(address),
+        ]);
+      } else {
+        need(!!this.map[assetType][tick]);
+        return this.map[assetType][tick].balanceOf(address);
+      }
+    } catch (err) {
+      return "0";
+    }
   }
 
   mint(
