@@ -17,7 +17,11 @@
       FuncType["removeLiq"] = "removeLiq";
   })(FuncType || (FuncType = {}));
 
-  function sortTickParams(params) {
+  function sortTickParams(_params) {
+      const params = _params;
+      if (!params.tick0 || !params.tick1) {
+          return params;
+      }
       if (params.tick0 < params.tick1) {
           return params;
       }
@@ -129,6 +133,7 @@
       }
       transfer(from, to, amount) {
           this.checkAmount(amount);
+          this.checkAddress(from, amount);
           this.balance[from] = uintCal([this.balance[from], "sub", amount]);
           this.balance[to] = uintCal([this.balance[to] || "0", "add", amount]);
           this.checkAddress(from);
@@ -146,6 +151,7 @@
       }
       burn(address, amount) {
           this.checkAmount(amount);
+          this.checkAddress(address, amount);
           this.balance[address] = uintCal([
               this.balance[address] || "0",
               "sub",
@@ -155,10 +161,10 @@
           this.checkAddress(address);
       }
       checkAmount(amount) {
-          need(bn(amount).gt("0"), "invalid amount");
+          need(bn(amount).gt("0"), "invalid amount: " + this.tick);
       }
-      checkAddress(address) {
-          need(bn(this.balance[address]).gte("0"), "insufficient amount");
+      checkAddress(address, value = "0") {
+          need(bn(this.balance[address]).gte(value), "insufficient amount: " + this.tick);
       }
   }
 
@@ -193,7 +199,24 @@
           return this.map[assetType][tick];
       }
       getBalance(address, tick, assetType = "swap") {
-          return this.map[assetType][tick].balanceOf(address);
+          try {
+              if (assetType == "module") {
+                  return uintCal([
+                      this.map["available"][tick].balanceOf(address),
+                      "add",
+                      this.map["approve"][tick].balanceOf(address),
+                      "add",
+                      this.map["conditionalApprove"][tick].balanceOf(address),
+                  ]);
+              }
+              else {
+                  need(!!this.map[assetType][tick]);
+                  return this.map[assetType][tick].balanceOf(address);
+              }
+          }
+          catch (err) {
+              return "0";
+          }
       }
       mint(address, tick, amount, assetType = "swap") {
           this.tryCreate(tick);
@@ -373,32 +396,18 @@
           return { tick0, tick1, amount0: acquire0, amount1: acquire1 };
       }
       swap(params) {
-          const { tick0, tick1, address, tick, exactType, expect, slippage1000, amount, } = sortTickParams(params);
+          const { tickIn, tickOut, address, exactType, expect, slippage1000, amount, } = params;
           checkGtZero(amount);
           checkGteZero(expect);
           checkSlippage(slippage1000);
-          const pair = getPairStr(tick0, tick1);
+          const pair = getPairStr(tickIn, tickOut);
+          const reserveIn = this.assets.get(tickIn).balanceOf(pair);
+          const reserveOut = this.assets.get(tickOut).balanceOf(pair);
           let amountIn;
           let amountOut;
-          let reserveIn;
-          let reserveOut;
-          let tickIn;
-          let tickOut;
           let ret;
           if (exactType == ExactType.exactIn) {
               amountIn = amount;
-              if (tick == tick0) {
-                  reserveIn = this.assets.get(tick0).balanceOf(pair);
-                  reserveOut = this.assets.get(tick1).balanceOf(pair);
-                  tickIn = tick0;
-                  tickOut = tick1;
-              }
-              else {
-                  reserveIn = this.assets.get(tick1).balanceOf(pair);
-                  reserveOut = this.assets.get(tick0).balanceOf(pair);
-                  tickIn = tick1;
-                  tickOut = tick0;
-              }
               amountOut = this.getAmountOut({
                   amountIn,
                   reserveIn,
@@ -414,18 +423,6 @@
           }
           else {
               amountOut = amount;
-              if (tick == tick0) {
-                  reserveIn = this.assets.get(tick1).balanceOf(pair);
-                  reserveOut = this.assets.get(tick0).balanceOf(pair);
-                  tickIn = tick1;
-                  tickOut = tick0;
-              }
-              else {
-                  reserveIn = this.assets.get(tick0).balanceOf(pair);
-                  reserveOut = this.assets.get(tick1).balanceOf(pair);
-                  tickIn = tick0;
-                  tickOut = tick1;
-              }
               amountIn = this.getAmountIn({
                   amountOut,
                   reserveIn,
