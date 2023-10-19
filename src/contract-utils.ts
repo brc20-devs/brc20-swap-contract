@@ -4,14 +4,11 @@ import { bn } from "./bn";
 /**
  * Sort tick params
  */
-export function sortTickParams<T>(
-  params: {
-    tick0: string;
-    tick1: string;
-    amount0?: string;
-    amount1?: string;
-  } & T
-): typeof params {
+export function sortTickParams<T>(_params: T): T {
+  const params = _params as any;
+  if (!params.tick0 || !params.tick1) {
+    return params;
+  }
   if (params.tick0 < params.tick1) {
     return params;
   } else {

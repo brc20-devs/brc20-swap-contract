@@ -80,9 +80,8 @@ export type SwapParams = [
 
 export type SwapIn = {
   address: string;
-  tick0: string;
-  tick1: string;
-  tick: string;
+  tickIn: string;
+  tickOut: string;
   amount: string;
   exactType: ExactType;
   expect: string;

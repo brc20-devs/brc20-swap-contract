@@ -236,44 +236,30 @@ export class Contract {
 
   public swap(params: SwapIn): SwapOut {
     const {
-      tick0,
-      tick1,
+      tickIn,
+      tickOut,
       address,
-      tick,
       exactType,
       expect,
       slippage1000,
       amount,
-    } = sortTickParams(params);
+    } = params;
 
     checkGtZero(amount);
     checkGteZero(expect);
     checkSlippage(slippage1000);
 
-    const pair = getPairStr(tick0, tick1);
+    const pair = getPairStr(tickIn, tickOut);
+
+    const reserveIn = this.assets.get(tickIn).balanceOf(pair);
+    const reserveOut = this.assets.get(tickOut).balanceOf(pair);
 
     let amountIn: string;
     let amountOut: string;
-    let reserveIn: string;
-    let reserveOut: string;
-    let tickIn: string;
-    let tickOut: string;
     let ret: string;
 
     if (exactType == ExactType.exactIn) {
       amountIn = amount;
-      if (tick == tick0) {
-        reserveIn = this.assets.get(tick0).balanceOf(pair);
-        reserveOut = this.assets.get(tick1).balanceOf(pair);
-        tickIn = tick0;
-        tickOut = tick1;
-      } else {
-        reserveIn = this.assets.get(tick1).balanceOf(pair);
-        reserveOut = this.assets.get(tick0).balanceOf(pair);
-        tickIn = tick1;
-        tickOut = tick0;
-      }
-
       amountOut = this.getAmountOut({
         amountIn,
         reserveIn,
@@ -290,18 +276,6 @@ export class Contract {
       ret = amountOut;
     } else {
       amountOut = amount;
-      if (tick == tick0) {
-        reserveIn = this.assets.get(tick1).balanceOf(pair);
-        reserveOut = this.assets.get(tick0).balanceOf(pair);
-        tickIn = tick1;
-        tickOut = tick0;
-      } else {
-        reserveIn = this.assets.get(tick0).balanceOf(pair);
-        reserveOut = this.assets.get(tick1).balanceOf(pair);
-        tickIn = tick0;
-        tickOut = tick1;
-      }
-
       amountIn = this.getAmountIn({
         amountOut,
         reserveIn,
@@ -378,7 +352,6 @@ export class Contract {
     const { tick0, tick1 } = params;
 
     const pair = getPairStr(tick0, tick1);
-
     const reserve0 = this.assets.get(tick0).balanceOf(pair);
     const reserve1 = this.assets.get(tick1).balanceOf(pair);
 
