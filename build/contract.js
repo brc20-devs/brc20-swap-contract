@@ -42,15 +42,16 @@
   const invalid_amount = "invalid amount";
   const invalid_slippage = "invalid slippage";
   function checkGtZero(amount) {
-      need(bn(amount).gt("0") && bn(amount).isInteger(), invalid_amount);
+      need(bn(amount).gt("0") && bnIsInteger(amount), invalid_amount);
   }
   function checkGteZero(amount) {
-      need(bn(amount).gte("0") && bn(amount).isInteger(), invalid_amount);
+      need(bn(amount).gte("0") && bnIsInteger(amount), invalid_amount);
   }
   function checkSlippage(slippage) {
       need(bn(slippage).gte("0"), invalid_slippage);
       need(bn(slippage).lte("1000"), invalid_slippage);
-      need(bn(slippage).isInteger(), invalid_slippage);
+      need(bnIsInteger(slippage), invalid_slippage);
+      need(slippage == bn(slippage).toString(), invalid_amount);
   }
 
   const bn = BigNumber;
@@ -59,6 +60,9 @@
       DECIMAL_PLACES: 0,
       ROUNDING_MODE: bn.ROUND_DOWN,
   });
+  function bnIsInteger(value) {
+      return bn(value).isInteger() && value.toString().indexOf(".") == -1;
+  }
   function _bnCal(items, decimalPlaces) {
       const _bn = bn.clone();
       _bn.config({
@@ -480,7 +484,7 @@
           this.assets.get(tick).transfer(from, to, amount);
           return {};
       }
-      mintFee(params) {
+      getFeeLp(params) {
           const { tick0, tick1 } = params;
           const pair = getPairStr(tick0, tick1);
           const reserve0 = this.assets.get(tick0).balanceOf(pair);
@@ -498,8 +502,19 @@
                       const scale = uintCal([this.config.platformFeeRate, "sub", "1"]);
                       const denominator = uintCal([rootK, "mul", scale, "add", rootKLast]);
                       const liquidity = uintCal([numerator, "div", denominator]);
-                      this.assets.get(pair).mint(this.config.sequencer, liquidity);
+                      return liquidity;
                   }
+              }
+          }
+          return "0";
+      }
+      mintFee(params) {
+          const { tick0, tick1 } = params;
+          const pair = getPairStr(tick0, tick1);
+          if (this.config.platformFeeOn) {
+              const liquidity = this.getFeeLp(params);
+              if (bn(liquidity).gt("0")) {
+                  this.assets.get(pair).mint(this.config.sequencer, liquidity);
               }
           }
           else {
