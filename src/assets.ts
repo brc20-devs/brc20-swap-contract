@@ -59,24 +59,26 @@ export class Assets {
   getBalance(
     address: string,
     tick: string,
-    assetType: AssetType | "module" = "swap"
+    assetType: AssetType = "swap"
   ): string {
     try {
-      if (assetType == "module") {
-        return uintCal([
-          this.map["available"][tick].balanceOf(address),
-          "add",
-          this.map["approve"][tick].balanceOf(address),
-          "add",
-          this.map["conditionalApprove"][tick].balanceOf(address),
-        ]);
-      } else {
-        need(!!this.map[assetType][tick]);
-        return this.map[assetType][tick].balanceOf(address);
-      }
+      need(!!this.map[assetType][tick]);
+      return this.map[assetType][tick].balanceOf(address);
     } catch (err) {
       return "0";
     }
+  }
+
+  getAggregateBalance(
+    address: string,
+    tick: string,
+    assetTypes: AssetType[]
+  ): string {
+    let ret = "0";
+    assetTypes.forEach((assetType) => {
+      ret = uintCal([ret, "add", this.getBalance(address, tick, assetType)]);
+    });
+    return ret;
   }
 
   mint(
