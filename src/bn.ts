@@ -17,7 +17,14 @@ export function bnUint(value: string, decimal: string) {
 }
 
 export function bnDecimalPlacesValid(amount: string, decimal: string) {
-  return bn(bn(amount).decimalPlaces()!).lte(decimal);
+  const valid1 = bn(bn(amount).decimalPlaces()!).lte(decimal);
+  const valid2 = bn(decimal).gte(amount.split(".")[1]?.length || "0"); // 10.0
+  return valid1 && valid2;
+}
+
+export function bnIsInteger(value: BigNumber.Value) {
+  // 10.0 is false
+  return bn(value).isInteger() && value.toString().indexOf(".") == -1;
 }
 
 export function bnDecimal(value: string, decimal: string) {

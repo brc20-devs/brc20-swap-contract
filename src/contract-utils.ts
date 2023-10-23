@@ -1,5 +1,5 @@
 import { Pair } from "./types";
-import { bn } from "./bn";
+import { bn, bnIsInteger } from "./bn";
 
 /**
  * Sort tick params
@@ -62,15 +62,16 @@ const invalid_amount = "invalid amount";
 const invalid_slippage = "invalid slippage";
 
 export function checkGtZero(amount: string) {
-  need(bn(amount).gt("0") && bn(amount).isInteger(), invalid_amount);
+  need(bn(amount).gt("0") && bnIsInteger(amount), invalid_amount);
 }
 
 export function checkGteZero(amount: string) {
-  need(bn(amount).gte("0") && bn(amount).isInteger(), invalid_amount);
+  need(bn(amount).gte("0") && bnIsInteger(amount), invalid_amount);
 }
 
 export function checkSlippage(slippage: string) {
   need(bn(slippage).gte("0"), invalid_slippage);
   need(bn(slippage).lte("1000"), invalid_slippage);
-  need(bn(slippage).isInteger(), invalid_slippage);
+  need(bnIsInteger(slippage), invalid_slippage);
+  need(slippage == bn(slippage).toString(), invalid_amount);
 }
