@@ -348,7 +348,7 @@ export class Contract {
     return {};
   }
 
-  private mintFee(params: MintFeeIn) {
+  getFeeLp(params: MintFeeIn) {
     const { tick0, tick1 } = params;
 
     const pair = getPairStr(tick0, tick1);
@@ -369,8 +369,21 @@ export class Contract {
           const denominator = uintCal([rootK, "mul", scale, "add", rootKLast]);
           const liquidity = uintCal([numerator, "div", denominator]);
 
-          this.assets.get(pair).mint(this.config.sequencer, liquidity);
+          return liquidity;
         }
+      }
+    }
+
+    return "0";
+  }
+
+  private mintFee(params: MintFeeIn) {
+    const { tick0, tick1 } = params;
+    const pair = getPairStr(tick0, tick1);
+    if (this.config.platformFeeOn) {
+      const liquidity = this.getFeeLp(params);
+      if (bn(liquidity).gt("0")) {
+        this.assets.get(pair).mint(this.config.sequencer, liquidity);
       }
     } else {
       this.status.kLast[pair] = "0";
