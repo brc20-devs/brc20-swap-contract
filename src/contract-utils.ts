@@ -58,8 +58,8 @@ export function need(condition: boolean, message?: string) {
   }
 }
 
-const invalid_amount = "invalid amount";
-const invalid_slippage = "invalid slippage";
+export const invalid_amount = "invalid amount";
+export const invalid_slippage = "invalid slippage";
 
 export function checkGtZero(amount: string) {
   need(bn(amount).gt("0") && bnIsInteger(amount), invalid_amount);

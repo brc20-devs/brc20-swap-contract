@@ -1,5 +1,5 @@
 import BigNumber from "bignumber.js";
-import { need } from "./contract-utils";
+import { invalid_amount, need } from "./contract-utils";
 
 export const bn = BigNumber as typeof BigNumber;
 
@@ -56,23 +56,23 @@ function _bnCal(
     const cur = items[i];
     const next = items[i + 1];
     if (cur == "add") {
-      need(_bn(next).gte("0"));
+      need(_bn(next).gte("0"), invalid_amount);
       ret = ret.plus(next);
       i++;
     } else if (cur == "sub") {
-      need(_bn(ret).gte(next));
+      need(_bn(ret).gte(next), invalid_amount);
       ret = ret.minus(next);
       i++;
     } else if (cur == "mul") {
-      need(_bn(next).gte("0"));
+      need(_bn(next).gte("0"), invalid_amount);
       ret = ret.times(next);
       i++;
     } else if (cur == "div") {
-      need(_bn(next).gt("0"));
+      need(_bn(next).gt("0"), invalid_amount);
       ret = ret.div(next);
       i++;
     } else if (cur == "pow") {
-      need(_bn(next).gte("0"));
+      need(_bn(next).gte("0"), invalid_amount);
       ret = ret.pow(next);
       i++;
     } else if (cur == "sqrt") {
