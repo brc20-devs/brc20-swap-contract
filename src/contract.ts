@@ -26,11 +26,14 @@ import {
 } from "./contract-utils";
 import { Assets } from "./assets";
 
-const exceeding_slippage = "exceeding slippage";
-const duplicate_tick = "duplicate tick";
-const insufficient_liquidity = "insufficient liquidity for this trade";
-const pool_existed = "pool existed";
-const pool_not_found = "pool not found";
+export const exceeding_slippage = "exceeding slippage";
+export const duplicate_tick = "duplicate tick";
+export const insufficient_liquidity = "insufficient liquidity for this trade";
+export const pool_existed = "pool existed";
+export const pool_not_found = "pool not found";
+
+const feeOn = true;
+const feeRate = "6";
 
 export class Contract {
   readonly assets: Assets;
@@ -99,7 +102,7 @@ export class Contract {
         exceeding_slippage
       );
 
-      if (this.config.platformFeeOn) {
+      if (feeOn) {
         this.status.kLast[pair] = uintCal([
           this.assets.get(tick0).balanceOf(pair),
           "mul",
@@ -159,7 +162,7 @@ export class Contract {
       );
       need(amount1Adjust == amount1 || amount0Adjust == amount0);
 
-      if (this.config.platformFeeOn) {
+      if (feeOn) {
         this.status.kLast[pair] = uintCal([
           this.assets.get(tick0).balanceOf(pair),
           "mul",
@@ -223,7 +226,7 @@ export class Contract {
       exceeding_slippage
     );
 
-    if (this.config.platformFeeOn) {
+    if (feeOn) {
       this.status.kLast[pair] = uintCal([
         this.assets.get(tick0).balanceOf(pair),
         "mul",
@@ -355,7 +358,7 @@ export class Contract {
     const reserve0 = this.assets.get(tick0).balanceOf(pair);
     const reserve1 = this.assets.get(tick1).balanceOf(pair);
 
-    if (this.config.platformFeeOn) {
+    if (feeOn) {
       if (bn(this.status.kLast[pair]).gt("0")) {
         const rootK = uintCal([reserve0, "mul", reserve1, "sqrt"]);
         const rootKLast = uintCal([this.status.kLast[pair], "sqrt"]);
@@ -365,7 +368,7 @@ export class Contract {
             "mul",
             uintCal([rootK, "sub", rootKLast]),
           ]);
-          const scale = uintCal([this.config.platformFeeRate, "sub", "1"]);
+          const scale = uintCal([feeRate, "sub", "1"]);
           const denominator = uintCal([rootK, "mul", scale, "add", rootKLast]);
           const liquidity = uintCal([numerator, "div", denominator]);
 
@@ -380,10 +383,10 @@ export class Contract {
   private mintFee(params: MintFeeIn) {
     const { tick0, tick1 } = params;
     const pair = getPairStr(tick0, tick1);
-    if (this.config.platformFeeOn) {
+    if (feeOn) {
       const liquidity = this.getFeeLp(params);
       if (bn(liquidity).gt("0")) {
-        this.assets.get(pair).mint(this.config.sequencer, liquidity);
+        this.assets.get(pair).mint(this.config.feeTo, liquidity);
       }
     } else {
       this.status.kLast[pair] = "0";

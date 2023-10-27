@@ -7,7 +7,7 @@ import { expandTo18Decimals } from "./shared/utilities";
 import { getPairStr } from "../src/contract-utils";
 import { ExactType } from "../src/types";
 
-const ADDRESS_SEQUENCER = "2";
+const FEE_TO = "2";
 const ADDRESS_ALICE = "1";
 const ADDRESS_ZERO = "0";
 const TICK_0 = "ordi";
@@ -43,11 +43,8 @@ describe("Contract Test", () => {
       kLast: {},
     };
     const contractConfig = {
-      sequencer: ADDRESS_SEQUENCER,
-      platformFeeOn: true,
+      feeTo: FEE_TO,
       swapFeeRate1000: "3",
-      platformFeeRate: "6",
-      feeTick: "sats",
     };
     contract = new Contract(assets, contractStatus, contractConfig);
     contract.deployPool({
@@ -225,54 +222,7 @@ describe("Contract Test", () => {
     );
   });
 
-  it("feeTo:off", async () => {
-    const defaultFeeOn = contract.config.platformFeeOn;
-    contract.config.platformFeeOn = false;
-
-    const token0Amount = expandTo18Decimals(1000);
-    const token1Amount = expandTo18Decimals(1000);
-    const swapAmount = expandTo18Decimals(1);
-    const expectedOutputAmount = "996006981039903216";
-    const pair = getPairStr(TICK_0, TICK_1);
-    contract.addLiq({
-      address: ADDRESS_ALICE,
-      tick0: TICK_0,
-      tick1: TICK_1,
-      amount0: token0Amount,
-      amount1: token1Amount,
-      expect: "0",
-      slippage1000: "0",
-    });
-    const swapResult = contract.swap({
-      tickIn: TICK_0,
-      tickOut: TICK_1,
-      address: ADDRESS_ALICE,
-      exactType: ExactType.exactOut,
-      expect: swapAmount,
-      slippage1000: "0",
-      amount: expectedOutputAmount,
-    });
-
-    expect(swapResult.amount).to.eq(swapAmount);
-
-    contract.removeLiq({
-      tick0: TICK_0,
-      tick1: TICK_1,
-      address: ADDRESS_ALICE,
-      lp: contract.assets.getBalance(ADDRESS_ALICE, pair),
-      amount0: "0",
-      amount1: "0",
-      slippage1000: "0",
-    });
-    expect(contract.assets.get(pair).supply).to.eq(MINIMUM_LIQUIDITY);
-
-    contract.config.platformFeeOn = defaultFeeOn;
-  });
-
-  it("feeTo:on", async () => {
-    const defaultFeeOn = contract.config.platformFeeOn;
-    contract.config.platformFeeOn = true;
-
+  it("feeTo", async () => {
     const token0Amount = expandTo18Decimals(1000);
     const token1Amount = expandTo18Decimals(1000);
     const swapAmount = expandTo18Decimals(1);
@@ -312,16 +262,12 @@ describe("Contract Test", () => {
       uintCal([MINIMUM_LIQUIDITY, "add", "249750499251388"])
     );
     expect(contract.assets.getBalance(ADDRESS_ALICE, pair)).to.eq("0");
-    expect(contract.assets.getBalance(ADDRESS_SEQUENCER, pair)).to.eq(
-      "249750499251388"
-    );
+    expect(contract.assets.getBalance(FEE_TO, pair)).to.eq("249750499251388");
     expect(contract.assets.getBalance(pair, TICK_0)).to.eq(
       uintCal(["1000", "add", "249501683697445"])
     );
     expect(contract.assets.getBalance(pair, TICK_1)).to.eq(
       uintCal(["1000", "add", "250000187312969"])
     );
-
-    contract.config.platformFeeOn = defaultFeeOn;
   });
 });

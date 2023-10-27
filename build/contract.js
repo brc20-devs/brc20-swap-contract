@@ -77,27 +77,27 @@
           const cur = items[i];
           const next = items[i + 1];
           if (cur == "add") {
-              need(_bn(next).gte("0"));
+              need(_bn(next).gte("0"), invalid_amount);
               ret = ret.plus(next);
               i++;
           }
           else if (cur == "sub") {
-              need(_bn(ret).gte(next));
+              need(_bn(ret).gte(next), invalid_amount);
               ret = ret.minus(next);
               i++;
           }
           else if (cur == "mul") {
-              need(_bn(next).gte("0"));
+              need(_bn(next).gte("0"), invalid_amount);
               ret = ret.times(next);
               i++;
           }
           else if (cur == "div") {
-              need(_bn(next).gt("0"));
+              need(_bn(next).gt("0"), invalid_amount);
               ret = ret.div(next);
               i++;
           }
           else if (cur == "pow") {
-              need(_bn(next).gte("0"));
+              need(_bn(next).gte("0"), invalid_amount);
               ret = ret.pow(next);
               i++;
           }
@@ -248,6 +248,7 @@
   const insufficient_liquidity = "insufficient liquidity for this trade";
   const pool_existed = "pool existed";
   const pool_not_found = "pool not found";
+  const feeRate = "6";
   class Contract {
       constructor(assets, status, config) {
           if (!(assets instanceof Assets)) {
@@ -292,7 +293,7 @@
                   "div",
                   "1000",
               ])), exceeding_slippage);
-              if (this.config.platformFeeOn) {
+              {
                   this.status.kLast[pair] = uintCal([
                       this.assets.get(tick0).balanceOf(pair),
                       "mul",
@@ -342,7 +343,7 @@
                   "1000",
               ])), exceeding_slippage);
               need(amount1Adjust == amount1 || amount0Adjust == amount0);
-              if (this.config.platformFeeOn) {
+              {
                   this.status.kLast[pair] = uintCal([
                       this.assets.get(tick0).balanceOf(pair),
                       "mul",
@@ -386,7 +387,7 @@
               "div",
               "1000",
           ])), exceeding_slippage);
-          if (this.config.platformFeeOn) {
+          {
               this.status.kLast[pair] = uintCal([
                   this.assets.get(tick0).balanceOf(pair),
                   "mul",
@@ -485,7 +486,7 @@
           const pair = getPairStr(tick0, tick1);
           const reserve0 = this.assets.get(tick0).balanceOf(pair);
           const reserve1 = this.assets.get(tick1).balanceOf(pair);
-          if (this.config.platformFeeOn) {
+          {
               if (bn(this.status.kLast[pair]).gt("0")) {
                   const rootK = uintCal([reserve0, "mul", reserve1, "sqrt"]);
                   const rootKLast = uintCal([this.status.kLast[pair], "sqrt"]);
@@ -495,7 +496,7 @@
                           "mul",
                           uintCal([rootK, "sub", rootKLast]),
                       ]);
-                      const scale = uintCal([this.config.platformFeeRate, "sub", "1"]);
+                      const scale = uintCal([feeRate, "sub", "1"]);
                       const denominator = uintCal([rootK, "mul", scale, "add", rootKLast]);
                       const liquidity = uintCal([numerator, "div", denominator]);
                       return liquidity;
@@ -507,18 +508,20 @@
       mintFee(params) {
           const { tick0, tick1 } = params;
           const pair = getPairStr(tick0, tick1);
-          if (this.config.platformFeeOn) {
+          {
               const liquidity = this.getFeeLp(params);
               if (bn(liquidity).gt("0")) {
-                  this.assets.get(pair).mint(this.config.sequencer, liquidity);
+                  this.assets.get(pair).mint(this.config.feeTo, liquidity);
               }
-          }
-          else {
-              this.status.kLast[pair] = "0";
           }
       }
   }
 
   exports.Contract = Contract;
+  exports.duplicate_tick = duplicate_tick;
+  exports.exceeding_slippage = exceeding_slippage;
+  exports.insufficient_liquidity = insufficient_liquidity;
+  exports.pool_existed = pool_existed;
+  exports.pool_not_found = pool_not_found;
 
 }));

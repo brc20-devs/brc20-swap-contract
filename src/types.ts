@@ -243,10 +243,8 @@ export type ContractStatus = {
 };
 
 export type ContractConfig = {
-  sequencer: string;
-  platformFeeOn: boolean;
+  feeTo: string;
   swapFeeRate1000: string; // eg. 30(=0.3%)
-  platformFeeRate: string; // eg. 5(=0.3%*(1/5))
 };
 
 export type Balance = { [key: string]: { [key: string]: string } }; // addr -> tick -> amount
