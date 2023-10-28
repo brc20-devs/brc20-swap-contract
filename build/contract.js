@@ -249,11 +249,9 @@
   const pool_existed = "pool existed";
   const pool_not_found = "pool not found";
   const feeRate = "6";
+  const AssetsClass = Assets;
   class Contract {
       constructor(assets, status, config) {
-          if (!(assets instanceof Assets)) {
-              assets = new Assets(assets);
-          }
           this.assets = assets;
           this.status = status;
           this.config = config;
@@ -517,6 +515,7 @@
       }
   }
 
+  exports.AssetsClass = AssetsClass;
   exports.Contract = Contract;
   exports.duplicate_tick = duplicate_tick;
   exports.exceeding_slippage = exceeding_slippage;
