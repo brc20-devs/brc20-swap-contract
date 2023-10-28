@@ -35,15 +35,14 @@ export const pool_not_found = "pool not found";
 const feeOn = true;
 const feeRate = "6";
 
+export const AssetsClass = Assets;
+
 export class Contract {
   readonly assets: Assets;
   readonly status: ContractStatus;
   readonly config: ContractConfig;
 
   constructor(assets: Assets, status: ContractStatus, config: ContractConfig) {
-    if (!(assets instanceof Assets)) {
-      assets = new Assets(assets);
-    }
     this.assets = assets;
     this.status = status;
     this.config = config;
