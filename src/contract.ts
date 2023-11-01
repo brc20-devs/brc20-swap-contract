@@ -271,7 +271,9 @@ export class Contract {
       const amountOutMin = uintCal([
         expect,
         "mul",
-        uintCal(["1000", "div", uintCal(["1000", "add", slippage1000])]),
+        "1000",
+        "div",
+        uintCal(["1000", "add", slippage1000]),
       ]);
       need(bn(amountOut).gte(amountOutMin), exceeding_slippage);
 
